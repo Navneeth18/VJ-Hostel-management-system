@@ -1,0 +1,394 @@
+import React, { useState } from 'react';
+import axios from 'axios';
+import { useUser } from '../context/UserContext';
+
+function StudentProfile() {
+  const { user, login } = useUser();
+  const [activeTab, setActiveTab] = useState('profile');
+
+  // State for password change
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // State for profile photo
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [photoError, setPhotoError] = useState('');
+  const [photoSuccess, setPhotoSuccess] = useState('');
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  // Handle password input changes
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData({
+      ...passwordData,
+      [name]: value
+    });
+  };
+
+  // Handle password form submission
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+
+    // Reset messages
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    // Validate passwords
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters long');
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      const response = await axios.put('http://localhost:4000/student-api/change-password', {
+        rollNumber: user.rollNumber,
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+
+      setPasswordSuccess(response.data.message || 'Password changed successfully');
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (error) {
+      setPasswordError(error.response?.data?.message || 'Failed to change password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  // Handle file selection
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+
+      // Create a preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle photo upload
+  const handlePhotoUpload = async (e) => {
+    e.preventDefault();
+
+    if (!selectedFile) {
+      setPhotoError('Please select a file to upload');
+      return;
+    }
+
+    setPhotoLoading(true);
+    setPhotoError('');
+    setPhotoSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('profilePhoto', selectedFile);
+      formData.append('rollNumber', user.rollNumber);
+
+      const response = await axios.put(
+        'http://localhost:4000/student-api/update-profile-photo',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      // Update user context with new profile photo
+      login({
+        ...user,
+        profilePhoto: response.data.profilePhoto
+      });
+
+      setPhotoSuccess('Profile photo updated successfully');
+      setSelectedFile(null);
+    } catch (error) {
+      setPhotoError(error.response?.data?.message || 'Failed to upload profile photo');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      <h2 style={styles.header}>Student Profile</h2>
+
+      {/* Profile Photo */}
+      <div style={styles.photoContainer}>
+        {previewUrl ? (
+          <img src={previewUrl} alt="Profile Preview" style={styles.image} />
+        ) : user.profilePhoto ? (
+          <img src={user.profilePhoto} alt="Profile" style={styles.image} />
+        ) : (
+          <div style={styles.placeholderImage}>
+            {user.name ? user.name.charAt(0).toUpperCase() : 'S'}
+          </div>
+        )}
+      </div>
+
+      {/* Tab Navigation */}
+      <div style={styles.tabContainer}>
+        <button
+          style={activeTab === 'profile' ? {...styles.tabButton, ...styles.activeTab} : styles.tabButton}
+          onClick={() => setActiveTab('profile')}
+        >
+          Profile Info
+        </button>
+        <button
+          style={activeTab === 'photo' ? {...styles.tabButton, ...styles.activeTab} : styles.tabButton}
+          onClick={() => setActiveTab('photo')}
+        >
+          Update Photo
+        </button>
+        <button
+          style={activeTab === 'password' ? {...styles.tabButton, ...styles.activeTab} : styles.tabButton}
+          onClick={() => setActiveTab('password')}
+        >
+          Change Password
+        </button>
+      </div>
+
+      {/* Profile Info Tab */}
+      {activeTab === 'profile' && (
+        <div style={styles.infoContainer}>
+          <p><strong>Name:</strong> {user.name}</p>
+          <p><strong>Roll Number:</strong> {user.rollNumber}</p>
+          <p><strong>Branch:</strong> {user.branch}</p>
+          <p><strong>Year:</strong> {user.year}</p>
+          <p><strong>Phone Number:</strong> {user.phoneNumber}</p>
+          <p><strong>Parent Mobile Number:</strong> {user.parentMobileNumber}</p>
+          <p><strong>Email:</strong> {user.email}</p>
+          <p><strong>Room Number:</strong> {user.roomNumber}</p>
+        </div>
+      )}
+
+      {/* Update Photo Tab */}
+      {activeTab === 'photo' && (
+        <div style={styles.formContainer}>
+          <h3 style={styles.subHeader}>Update Profile Photo</h3>
+
+          {photoError && <p style={styles.errorText}>{photoError}</p>}
+          {photoSuccess && <p style={styles.successText}>{photoSuccess}</p>}
+
+          <form onSubmit={handlePhotoUpload}>
+            <div style={styles.formGroup}>
+              <label htmlFor="profilePhoto" style={styles.label}>Select Photo</label>
+              <input
+                type="file"
+                id="profilePhoto"
+                accept="image/*"
+                onChange={handleFileChange}
+                style={styles.fileInput}
+              />
+            </div>
+
+            <button
+              type="submit"
+              style={styles.submitButton}
+              disabled={photoLoading || !selectedFile}
+            >
+              {photoLoading ? 'Uploading...' : 'Upload Photo'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Change Password Tab */}
+      {activeTab === 'password' && (
+        <div style={styles.formContainer}>
+          <h3 style={styles.subHeader}>Change Password</h3>
+
+          {passwordError && <p style={styles.errorText}>{passwordError}</p>}
+          {passwordSuccess && <p style={styles.successText}>{passwordSuccess}</p>}
+
+          <form onSubmit={handlePasswordSubmit}>
+            <div style={styles.formGroup}>
+              <label htmlFor="currentPassword" style={styles.label}>Current Password</label>
+              <input
+                type="password"
+                id="currentPassword"
+                name="currentPassword"
+                value={passwordData.currentPassword}
+                onChange={handlePasswordChange}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label htmlFor="newPassword" style={styles.label}>New Password</label>
+              <input
+                type="password"
+                id="newPassword"
+                name="newPassword"
+                value={passwordData.newPassword}
+                onChange={handlePasswordChange}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label htmlFor="confirmPassword" style={styles.label}>Confirm New Password</label>
+              <input
+                type="password"
+                id="confirmPassword"
+                name="confirmPassword"
+                value={passwordData.confirmPassword}
+                onChange={handlePasswordChange}
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              style={styles.submitButton}
+              disabled={passwordLoading}
+            >
+              {passwordLoading ? 'Changing Password...' : 'Change Password'}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    maxWidth: '600px',
+    margin: '2rem auto',
+    padding: '2rem',
+    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+    borderRadius: '12px',
+    backgroundColor: '#fff',
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '1.5rem',
+  },
+  subHeader: {
+    marginBottom: '1.5rem',
+    fontSize: '1.2rem',
+    fontWeight: '500',
+  },
+  photoContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginBottom: '1.5rem',
+  },
+  image: {
+    width: '150px',
+    height: '150px',
+    borderRadius: '50%',
+    objectFit: 'cover',
+    border: '3px solid #f0f0f0',
+  },
+  placeholderImage: {
+    width: '150px',
+    height: '150px',
+    borderRadius: '50%',
+    backgroundColor: '#0D6EFD',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '3rem',
+    fontWeight: 'bold',
+  },
+  tabContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginBottom: '2rem',
+    borderBottom: '1px solid #dee2e6',
+  },
+  tabButton: {
+    padding: '0.75rem 1rem',
+    border: 'none',
+    background: 'none',
+    cursor: 'pointer',
+    fontWeight: '500',
+    color: '#6c757d',
+    borderBottom: '3px solid transparent',
+    transition: 'all 0.2s',
+  },
+  activeTab: {
+    color: '#0D6EFD',
+    borderBottom: '3px solid #0D6EFD',
+  },
+  infoContainer: {
+    lineHeight: '1.8',
+  },
+  formContainer: {
+    padding: '1rem 0',
+  },
+  formGroup: {
+    marginBottom: '1.5rem',
+  },
+  label: {
+    display: 'block',
+    marginBottom: '0.5rem',
+    fontWeight: '500',
+  },
+  input: {
+    width: '100%',
+    padding: '0.75rem',
+    borderRadius: '4px',
+    border: '1px solid #ced4da',
+    fontSize: '1rem',
+  },
+  fileInput: {
+    width: '100%',
+    padding: '0.5rem 0',
+  },
+  submitButton: {
+    backgroundColor: '#0D6EFD',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    padding: '0.75rem 1.5rem',
+    fontSize: '1rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+  },
+  errorText: {
+    color: '#dc3545',
+    marginBottom: '1rem',
+    padding: '0.5rem',
+    backgroundColor: '#f8d7da',
+    borderRadius: '4px',
+  },
+  successText: {
+    color: '#198754',
+    marginBottom: '1rem',
+    padding: '0.5rem',
+    backgroundColor: '#d1e7dd',
+    borderRadius: '4px',
+  },
+};
+
+export default StudentProfile;
