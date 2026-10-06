@@ -136,10 +136,10 @@ The hostel has 12 floors with specific allocation rules:
    node server.js
    ```
 
-#### Admin Client Setup
-1. Navigate to the admin-client directory:
+#### Client Setup (Unified Portal for Students & Admins)
+1. Navigate to the client directory:
    ```bash
-   cd admin-client
+   cd client
    ```
 
 2. Install dependencies:
@@ -152,21 +152,7 @@ The hostel has 12 floors with specific allocation rules:
    npm run dev
    ```
 
-#### Student Client Setup
-1. Navigate to the student-client directory:
-   ```bash
-   cd student-client
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
+   - Access Student Login & Admin Login at `http://localhost:5173/login` (or switch between Student & Admin tabs).
 
 ## Real-Time Chat Feature
 
